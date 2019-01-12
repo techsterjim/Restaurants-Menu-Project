@@ -17,7 +17,7 @@ import httplib2
 import json
 from flask import make_response
 import requests
-
+from sqlalchemy.orm.exc import NoResultFound
 
 app = Flask(__name__)
 
@@ -307,7 +307,7 @@ def getUserID(email):
     try:
         user = session.query(User).filter_by(email=email).one()
         return user.id
-    except ImportError:
+    except NoResultFound:
         return None
 
 
@@ -349,6 +349,9 @@ def newRestaurant():
     if 'username' not in login_session:
         return redirect('/login')
     if request.method == 'POST':
+        if request.form.get('name', '') == '':
+            flash('Error: Item cannot be empty!')
+            return render_template('newRestaurant.html')
         newRestaurant = Restaurant(
             name=request.form['name'], user_id=login_session['user_id'])
         session.add(newRestaurant)
@@ -367,9 +370,7 @@ def editRestaurant(restaurant_id):
     if 'username' not in login_session:
         return redirect('/login')
     if editedRestaurant.user_id != login_session['user_id']:
-        return "<script>function myFunction() {alert('You are not authorized\
-        to edit this restaurant. Please create your own restaurant.');}\
-        </script><body onload='myFunction()'>"
+        return "<script>{alert('Unauthorized');}</script>"
     if request.method == 'POST':
         if request.form['name']:
             editedRestaurant.name = request.form['name']
@@ -383,14 +384,12 @@ def editRestaurant(restaurant_id):
 # Delete a restaurant
 @app.route('/restaurant/<int:restaurant_id>/delete/', methods=['GET', 'POST'])
 def deleteRestaurant(restaurant_id):
-    restaurantToDelete = session.query(
-        Restaurant).filter_by(id=restaurant_id).one()
     if 'username' not in login_session:
         return redirect('/login')
+    restaurantToDelete = session.query(
+        Restaurant).filter_by(id=restaurant_id).one()
     if restaurantToDelete.user_id != login_session['user_id']:
-        return "<script>function myFunction(){alert('You cannot \
-        delete this restaurant. Please create your own restaurant.');}\
-        </script><body onload='myFunction()'>"
+        return "<script>{alert('Unauthorized');}</script>"
     if request.method == 'POST':
         session.delete(restaurantToDelete)
         flash('%s Successfully Deleted' % restaurantToDelete.name)
@@ -432,10 +431,22 @@ def newMenuItem(restaurant_id):
         return redirect('/login')
     restaurant = session.query(Restaurant).filter_by(id=restaurant_id).one()
     if login_session['user_id'] != restaurant.user_id:
-        return "<script>function myFunction() {alert('You cannot \
-        add menu items to this restaurant. Please create your own.')\
-        ;}</script><body onload='myFunction()'>"
+        return "<script>{alert('Unauthorized');}</script>"
     if request.method == 'POST':
+        for attr in ['name', 'description', 'price', 'course']:
+            if not request.form.get(attr):
+                flash
+                return render_template('newmenuitem.html',
+                                       restaurant_id=restaurant_id)
+        if request.form.get('name', '') == '':
+            flash('Error: Item cannot be empty!')
+        if request.form.get('description', '') == '':
+            flash('Error: Item cannot be empty!')
+        if request.form.get('price', '') == '':
+            flash('Error: Item cannot be empty!')
+        if request.form.get('course', '') == '':
+            flash('Error: Item cannot be empty!')
+
         newItem = MenuItem(name=request.form['name'],
                            description=request.form['description'],
                            price=request.form['price'],
@@ -458,9 +469,7 @@ def editMenuItem(restaurant_id, menu_id):
     editedItem = session.query(MenuItem).filter_by(id=menu_id).one()
     restaurant = session.query(Restaurant).filter_by(id=restaurant_id).one()
     if login_session['user_id'] != restaurant.user_id:
-        return "<script>function myFunction(){alert('You cannot\
-        edit menu items on this restaurant. Please create your own.');}\
-        </script><body onload='myFunction()'>"
+        return "<script>{alert('Unauthorized');}</script>"
     if request.method == 'POST':
         if request.form['name']:
             editedItem.name = request.form['name']
@@ -468,7 +477,7 @@ def editMenuItem(restaurant_id, menu_id):
             editedItem.description = request.form['description']
         if request.form['price']:
             editedItem.price = request.form['price']
-        if request.form['course']:
+        if request.form.get('course'):
             editedItem.course = request.form['course']
         session.add(editedItem)
         session.commit()
